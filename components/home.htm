@@ -1,61 +1,132 @@
 <!DOCTYPE html>
-<html>
-	<head>
-		<style>
-			body {
-				font-family: 'Arial', sans-serif;
-				background-color: #f0f0f0;
-				margin: 0;
-				padding: 0;
-				display: flex;
-				justify-content: center;
-				align-items: center;
-				height: 100vh;
-				color: #333;
-			}
+<html lang="en">
+<head>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
 
-			div {
-				text-align: center;
-				box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-				padding: 20px;
-				background-color: white;
-				border-radius: 8px;
-			}
+        div {
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+        }
 
-			h1 {
-				color: #171717;
-			}
+        h1 {
+            color: #171717;
+        }
 
-			nav {
-				margin-top: 20px;
-			}
+        nav {
+            margin-top: 20px;
+        }
 
-			a {
-				display: inline-block;
-				margin: 5px;
-				padding: 10px 15px;
-				background-color: #000000;
-				color: white;
-				text-decoration: none;
-				border-radius: 4px;
-				transition: background-color 0.3s;
-			}
+        a {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px 15px;
+            background-color: #000000;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
 
-			a:hover {
-				background-color: #171717;
-			}
-		</style>
-	</head>
-	<body>
-		<div>
-			<h1>Welcome to your user dashboard!</h1>
-			<p>This user dashboard was built with Express.js on Vercel.</p>
-			<nav>
-				<a href="/about">About Us</a>
-				<a href="/allUsers">View Users</a>
-				<a href="/uploadUser">Upload New User</a>
-				<a href="/images/logo.png">View Logo</a>
-			</nav>
-		</div>
-	</body>
+        a:hover {
+            background-color: #171717;
+        }
+
+        #newsContent {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            display: none;
+        }
+
+        #fetchNewsBtn {
+            padding: 10px 20px;
+            background-color: #000000;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #fetchNewsBtn:hover {
+            background-color: #171717;
+        }
+
+        #newsArticles div {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #ffffff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        #newsArticles a {
+            color: #0a16f7;
+            text-decoration: none;
+        }
+    </style>
+    <title>News Dashboard</title>
+</head>
+<body>
+    <div>
+        <h1>Welcome to your user dashboard!</h1>
+        <button id="fetchNewsBtn">Get Latest Crypto News</button>
+
+        <!-- News content section -->
+        <div id="newsContent">
+            <h2>Rephrased News</h2>
+            <div id="newsArticles"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('fetchNewsBtn').addEventListener('click', async function () {
+            try {
+                // Fetching rephrased news from the backend
+                const response = await fetch('/techNews');
+                const data = await response.json(); // Expecting JSON response from the backend
+
+                // If there is an article, display it
+                if (data.article) {
+                    const article = data.article;
+                    const newsContent = `
+                        <div>
+                            ${article.urlToImage ? `<img src="${article.urlToImage}" alt="Article Image" style="max-width: 100%; height: auto;"/>` : ''}
+                            <h3>${article.title}</h3>
+                            <p>${article.rephrasedContent}</p>
+                            <p>Published at: ${article.publishedAt}</p>
+                            <p>Data fetched at: ${article.fetchedAt}</p>
+                            <a href="${article.url}" target="_blank">Read More</a>
+                        </div>
+                    `;
+
+                    document.getElementById('newsArticles').innerHTML = newsContent;
+                    document.getElementById('newsContent').style.display = 'block';
+                } else {
+                    document.getElementById('newsArticles').innerHTML = 'No articles found.';
+                    document.getElementById('newsContent').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error fetching the news:', error);
+                document.getElementById('newsArticles').innerHTML = 'Error fetching news.';
+                document.getElementById('newsContent').style.display = 'block';
+            }
+        });
+    </script>
+</body>
 </html>

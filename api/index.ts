@@ -1,112 +1,127 @@
 require('dotenv').config();
 
 const express = require('express');
-const app = express();
-const { sql } = require('@vercel/postgres');
-
-const bodyParser = require('body-parser');
+const axios = require('axios');
 const path = require('path');
+const { TwitterApi } = require('twitter-api-v2');
 
-// Create application/x-www-form-urlencoded parser
-const urlencodedParser = bodyParser.urlencoded({ extended: false });
-
+const app = express();
 app.use(express.static('public'));
+const port = process.env.PORT || 8000;
+
+const twitterClient = new TwitterApi({
+  appKey: process.env.TWITTER_APP_KEY,
+  appSecret: process.env.TWITTER_APP_SECRET,
+  accessToken: process.env.TWITTER_ACCESS_TOKEN,
+  accessSecret: process.env.TWITTER_ACCESS_SECRET,
+});
 
 app.get('/', function (req, res) {
-	res.sendFile(path.join(__dirname, '..', 'components', 'home.htm'));
+  res.sendFile(path.join(__dirname, '..', 'components', 'home.htm'));
 });
 
-app.get('/about', function (req, res) {
-	res.sendFile(path.join(__dirname, '..', 'components', 'about.htm'));
+app.get('/techNews', async (req, res) => {
+  try {
+    const response = await axios.get(`https://newsapi.org/v2/everything`, {
+      params: {
+        q: 'CryptoCurrency',
+        language: 'en',
+        sortBy: 'publishedAt',
+        apiKey: process.env.NEWS_API_KEY,
+      },
+    });
+
+    const articles = response.data.articles;
+
+    if (articles.length) {
+      const firstArticle = articles[0]; // Get the first article only
+      const rephrasedContent = await rephraseWithGoogleBard(
+        firstArticle.title,
+        firstArticle.url,
+        firstArticle.description
+      );
+
+      // Log the rephrased content to check if it's being fetched correctly
+      console.log('Rephrased content:', rephrasedContent);
+
+      // Posting to Twitter
+      await postToTwitter(rephrasedContent); // Post rephrased content to Twitter
+
+      const newsArticle = {
+        title: firstArticle.title,
+        description: firstArticle.description,
+        content: firstArticle.content,
+        urlToImage: firstArticle.urlToImage,
+        url: firstArticle.url,
+        publishedAt: new Date(firstArticle.publishedAt).toLocaleString(),
+        rephrasedContent: rephrasedContent,
+        fetchedAt: new Date().toLocaleString(), // Time when the API was called
+      };
+
+      // Log the entire newsArticle to check all data
+    //   console.log('News Article:', newsArticle);
+
+      res.status(200).json({ article: newsArticle }); // Send the article with all the required info
+    } else {
+      res.status(404).send({ message: 'No news articles found' });
+    }
+  } catch (error) {
+    console.error('Error fetching news:', error.message);
+    res.status(500).json({ message: 'Error fetching news' });
+  }
 });
 
-app.get('/uploadUser', function (req, res) {
-	res.sendFile(path.join(__dirname, '..', 'components', 'user_upload_form.htm'));
-});
+// Function to rephrase content using Google Bard API
+async function rephraseWithGoogleBard(title, url, description) {
+  try {
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.BARD_API_KEY}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: `Generate a concise and engaging tweet for X.com under 279 characters based on the news title: ${title}. 
+                Use the reference URL: ${url} to gather more information. 
+                Include relevant hashtags, emojis, and avoid posting any reference links in the tweet. 
+                Ensure that the tone is aligned with the topic of cryptocurrency. 
+                Here’s a brief summary to help: ${description}.`,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
-app.post('/uploadSuccessful', urlencodedParser, async (req, res) => {
-	try {
-		await sql`INSERT INTO Users (Id, Name, Email) VALUES (${req.body.user_id}, ${req.body.name}, ${req.body.email});`;
-		res.status(200).send('<h1>User added successfully</h1>');
-	} catch (error) {
-		console.error(error);
-		res.status(500).send('Error adding user');
-	}
-});
+    const rephrasedText =
+      response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-app.get('/allUsers', async (req, res) => {
-	try {
-		const users = await sql`SELECT * FROM Users;`;
-		if (users && users.rows.length > 0) {
-			let tableContent = users.rows
-				.map(
-					(user) =>
-						`<tr>
-                        <td>${user.id}</td>
-                        <td>${user.name}</td>
-                        <td>${user.email}</td>
-                    </tr>`
-				)
-				.join('');
+    // Log rephrased text to check if it's being returned correctly
+    // console.log(rephrasedText, 'rephrasedText');
 
-			res.status(200).send(`
-                <html>
-                    <head>
-                        <title>Users</title>
-                        <style>
-                            body {
-                                font-family: Arial, sans-serif;
-                            }
-                            table {
-                                width: 100%;
-                                border-collapse: collapse;
-                                margin-bottom: 15px;
-                            }
-                            th, td {
-                                border: 1px solid #ddd;
-                                padding: 8px;
-                                text-align: left;
-                            }
-                            th {
-                                background-color: #f2f2f2;
-                            }
-                            a {
-                                text-decoration: none;
-                                color: #0a16f7;
-                                margin: 15px;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>Users</h1>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>User ID</th>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${tableContent}
-                            </tbody>
-                        </table>
-                        <div>
-                            <a href="/">Home</a>
-                            <a href="/uploadUser">Add User</a>
-                        </div>
-                    </body>
-                </html>
-            `);
-		} else {
-			res.status(404).send('Users not found');
-		}
-	} catch (error) {
-		console.error(error);
-		res.status(500).send('Error retrieving users');
-	}
-});
+    return rephrasedText || `${title} - ${url}`; // Return the rephrased text, or fallback to the original title and URL
+  } catch (error) {
+    console.error('Error rephrasing content:', error.message);
+    return `${title} - ${url}`; // In case of error, return the original title and URL
+  }
+}
 
-app.listen(3004, () => console.log('Server ready on port 3004.'));
+// Function to post the tweet to Twitter
+async function postToTwitter(tweetText) {
+  try {
+    const { data } = await twitterClient.v2.tweet(tweetText);
+    console.log(`Tweet posted successfully with ID: ${data.id}`);
+    latestTweet = tweetText; // Update the latestTweet variable
+  } catch (error) {
+    console.error("Error posting to Twitter:", error.message);
+  }
+}
+
+app.listen(port, () => console.log(`Server ready on port ${port}.`));
 
 module.exports = app;
