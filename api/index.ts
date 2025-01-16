@@ -116,7 +116,7 @@ async function postToTwitter(tweetText) {
   try {
     const { data } = await twitterClient.v2.tweet(tweetText);
     console.log(`Tweet posted successfully with ID: ${data.id}`);
-    latestTweet = tweetText; // Update the latestTweet variable
+    // latestTweet = tweetText; // Update the latestTweet variable
   } catch (error) {
     console.error("Error posting to Twitter:", error.message);
   }
